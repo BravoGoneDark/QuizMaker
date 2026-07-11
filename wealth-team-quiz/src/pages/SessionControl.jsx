@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useParams } from 'react-router-dom'
 import { supabase } from '../supabaseClient'
+import { Link } from 'react-router-dom'
+import { QRCodeSVG } from 'qrcode.react'
 
 export default function SessionControl() {
   const { sessionId } = useParams()
@@ -16,6 +18,7 @@ export default function SessionControl() {
   const [savingTimer, setSavingTimer] = useState(false)
   const [currentQuestion, setCurrentQuestion] = useState(null)
   const [participantCount, setParticipantCount] = useState(0)
+  const [leaderboard, setLeaderboard] = useState([])
 
   const intervalRef = useRef(null)
 
@@ -87,6 +90,7 @@ export default function SessionControl() {
         .single()
 
       if (!error) setSession(data)
+      loadLeaderboard()
       return
     }
 
@@ -98,6 +102,7 @@ export default function SessionControl() {
       .single()
 
     if (!error) setSession(data)
+    loadLeaderboard()
   }, [session, quiz, totalQuestions])
 
   // ---- Countdown timer: resets whenever the current question changes,
@@ -237,6 +242,59 @@ export default function SessionControl() {
     setQuiz(data)
   }
 
+  async function loadLeaderboard() {
+    const { data, error } = await supabase
+      .from('responses')
+      .select('participant_id, score_awarded, time_taken_ms, participants!inner(session_id, employee_code, first_name, last_name)')
+      .eq('participants.session_id', session.id)
+
+    if (error) {
+      console.error('Leaderboard load failed:', error.message)
+      return
+    }
+
+    const byParticipant = {}
+    for (const r of data) {
+      const pid = r.participant_id
+      if (!byParticipant[pid]) {
+        byParticipant[pid] = {
+          participantId: pid,
+          employeeCode: r.participants.employee_code,
+          firstName: r.participants.first_name,
+          lastName: r.participants.last_name,
+          totalScore: 0,
+          totalTime: 0,
+          answeredCount: 0,
+        }
+      }
+      byParticipant[pid].totalScore += r.score_awarded
+      byParticipant[pid].totalTime += r.time_taken_ms
+      byParticipant[pid].answeredCount += 1
+    }
+
+    const rows = Object.values(byParticipant).map((p) => ({
+      ...p,
+      avgTime: p.answeredCount > 0 ? p.totalTime / p.answeredCount : Infinity,
+    }))
+
+    rows.sort((a, b) => b.totalScore - a.totalScore || a.avgTime - b.avgTime)
+
+    // Standard competition ranking (1, 2, 2, 4...)
+    let rank = 0
+    let prevScore = null
+    let prevAvgTime = null
+    rows.forEach((row, i) => {
+      if (row.totalScore !== prevScore || row.avgTime !== prevAvgTime) {
+        rank = i + 1
+      }
+      row.rank = rank
+      prevScore = row.totalScore
+      prevAvgTime = row.avgTime
+    })
+
+    setLeaderboard(rows)
+  }
+
   if (loading) return <div className="p-8">Loading session...</div>
   if (loadError) return <div className="p-8 text-red-600">Error: {loadError}</div>
   if (!session || !quiz) return null
@@ -277,6 +335,9 @@ export default function SessionControl() {
           <div>
             <p className="text-sm font-medium mb-1">Join Link</p>
             <p className="text-sm text-gray-600 break-all">{joinLink}</p>
+            <div className="mt-3 inline-block p-3 bg-white border rounded">
+              <QRCodeSVG value={joinLink} size={160} />
+            </div>
           </div>
 
           <p className="text-sm text-gray-700">
@@ -326,6 +387,20 @@ export default function SessionControl() {
             </div>
           )}
 
+          {leaderboard.length > 0 && (
+            <div className="border-t pt-4">
+              <p className="text-sm font-medium mb-2">Leaderboard (Top 10)</p>
+              <ol className="space-y-1 text-sm">
+                {leaderboard.slice(0, 10).map((row) => (
+                  <li key={row.participantId} className="flex justify-between">
+                    <span>{row.rank}. {row.firstName} {row.lastName} ({row.employeeCode})</span>
+                    <span className="font-mono">{row.totalScore} pts</span>
+                  </li>
+                ))}
+              </ol>
+            </div>
+          )}
+
           <button
             onClick={handleEnd}
             className="px-4 py-2 bg-red-600 text-white rounded"
@@ -336,8 +411,14 @@ export default function SessionControl() {
       )}
 
       {session.status === 'ended' && (
-        <div className="border rounded p-4">
+        <div className="border rounded p-4 space-y-3">
           <p className="text-gray-600">This session has ended.</p>
+          <Link
+            to={`/session/${session.id}/results`}
+            className="inline-block px-4 py-2 bg-blue-600 text-white rounded text-sm"
+          >
+            View Results
+          </Link>
         </div>
       )}
     </div>

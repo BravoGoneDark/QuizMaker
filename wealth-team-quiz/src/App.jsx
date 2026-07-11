@@ -4,6 +4,9 @@ import Dashboard from './pages/Dashboard'
 import { ProtectedRoute } from './components/ProtectedRoute'
 import QuestionUpload from './pages/QuestionUpload'
 import SessionControl from './pages/SessionControl'
+import Join from './pages/Join'
+import ParticipantQuiz from './pages/ParticipantQuiz'
+import ResultsScreen from './pages/ResultsScreen'
 
 function App() {
   return (
@@ -31,6 +34,14 @@ function App() {
           element={
             <ProtectedRoute>
               <SessionControl />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/session/:sessionId/results"
+          element={
+            <ProtectedRoute>
+              <ResultsScreen />
             </ProtectedRoute>
           }
         />
