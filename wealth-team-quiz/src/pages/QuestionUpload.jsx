@@ -1,6 +1,7 @@
 import { useState } from "react";
 import * as XLSX from "xlsx";
 import { supabase } from "../supabaseClient";
+import heroQuestion from "../assets/hero-question.avif";
 
 // Exact headers your template uses. Asterisks are literal characters
 // in the header text, not markdown emphasis.
@@ -159,100 +160,177 @@ export default function QuestionUpload() {
     setStatus("success");
   }
 
+  // Presentational-only tallies for the header; doesn't touch row data
+  // or the validation logic above.
+  const errorCount = rows.filter((r) => r.errors.length > 0).length;
+  const warningCount = rows.filter((r) => r.errors.length === 0 && r.warnings.length > 0).length;
+  const readyCount = rows.length - errorCount - warningCount;
+
   return (
-    <div className="max-w-4xl mx-auto p-6 space-y-6">
-      <h1 className="text-xl font-semibold">Upload Quiz Questions</h1>
-
-      <div className="space-y-2">
-        <label className="block text-sm font-medium">Quiz Name</label>
-        <input
-          type="text"
-          value={quizName}
-          onChange={(e) => setQuizName(e.target.value)}
-          className="w-full border rounded px-3 py-2"
-          placeholder="e.g. Wealth Team Weekly Quiz - July"
-        />
-      </div>
-
-      <div className="space-y-2">
-        <label className="block text-sm font-medium">
-          Timer (seconds) -- initial value, can be changed later before the live session
-        </label>
-        <input
-          type="number"
-          min="1"
-          value={timerSeconds}
-          onChange={(e) => setTimerSeconds(e.target.value)}
-          className="w-full border rounded px-3 py-2"
-          placeholder="e.g. 30"
-        />
-      </div>
-
-      <div className="space-y-2">
-        <label className="block text-sm font-medium">Questions File (.xlsx)</label>
-        <input type="file" accept=".xlsx" onChange={handleFile} />
-        {fileName && <p className="text-sm text-gray-500">Selected: {fileName}</p>}
-        {parseError && <p className="text-sm text-red-600">{parseError}</p>}
-      </div>
-
-      {rows.length > 0 && (
-        <div className="overflow-x-auto border rounded">
-          <table className="min-w-full text-sm">
-            <thead className="bg-gray-100">
-              <tr>
-                <th className="p-2 text-left">Status</th>
-                <th className="p-2 text-left">Q#</th>
-                <th className="p-2 text-left">Question Text</th>
-                <th className="p-2 text-left">Marks</th>
-                <th className="p-2 text-left">Correct</th>
-                <th className="p-2 text-left">Notes</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((r, i) => {
-                const rowStatus = r.errors.length > 0 ? "error" : r.warnings.length > 0 ? "warning" : "ok";
-                const rowClass =
-                  rowStatus === "error"
-                    ? "bg-red-50"
-                    : rowStatus === "warning"
-                    ? "bg-yellow-50"
-                    : "bg-green-50";
-                return (
-                  <tr key={i} className={rowClass}>
-                    <td className="p-2 font-medium capitalize">{rowStatus}</td>
-                    <td className="p-2">{r["Question No"]}</td>
-                    <td className="p-2">{r["Question Text"]}</td>
-                    <td className="p-2">{r["Marks*"]}</td>
-                    <td className="p-2">{r["CorrectAnswer*"]}</td>
-                    <td className="p-2 text-xs">
-                      {[...r.errors, ...r.warnings].join("; ")}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+    <div className="h-screen overflow-hidden bg-[#17140F] text-[#F6F1E6] font-sans flex flex-col">
+      <header className="shrink-0 flex items-center justify-between px-8 py-4 border-b border-[#AB932B]/15">
+        <div>
+          <p className="text-xs uppercase tracking-[0.15em] text-[#AB932B]/70 mb-1">Quiz Master</p>
+          <h1 className="font-serif text-2xl">Upload Questions</h1>
         </div>
-      )}
+        {rows.length > 0 && (
+          <p className="text-xs text-[#F6F1E6]/50">
+            {readyCount} ready · {warningCount} warning{warningCount === 1 ? "" : "s"} ·{" "}
+            {errorCount} error{errorCount === 1 ? "" : "s"}
+          </p>
+        )}
+      </header>
 
-      <button
-        onClick={handleConfirm}
-        disabled={!canConfirm}
-        className="px-4 py-2 rounded bg-blue-600 text-white disabled:bg-gray-300 disabled:cursor-not-allowed"
-      >
-        {status === "uploading" ? "Uploading..." : "Confirm Upload"}
-      </button>
+      <main className="flex-1 min-h-0 grid grid-cols-[1fr_1.4fr] gap-5 p-5">
+        {/* LEFT: hero panel doubling as the setup form */}
+        <section className="relative rounded-2xl overflow-hidden border border-[#AB932B]/15">
+          <img src={heroQuestion} alt="" className="absolute inset-0 w-full h-full object-cover" />
+          <div className="absolute inset-0 bg-gradient-to-t from-[#17140F] via-[#17140F]/75 to-[#17140F]/40" />
 
-      {status === "success" && (
-        <p className="text-green-700 text-sm">
-          Quiz created successfully (id: {newQuizId}). All {rows.length} questions inserted.
-        </p>
-      )}
-      {status === "error" && (
-        <p className="text-red-600 text-sm">
-          Upload failed, nothing was saved: {uploadError}
-        </p>
-      )}
+          <div className="relative h-full flex flex-col justify-between p-8">
+            <div>
+              <p className="text-xs uppercase tracking-[0.15em] text-[#AB932B]/70 mb-1">New Quiz</p>
+              <p className="font-serif text-3xl">Set up &amp; upload</p>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs uppercase tracking-[0.1em] text-[#F6F1E6]/60 mb-1.5">
+                  Quiz name
+                </label>
+                <input
+                  type="text"
+                  value={quizName}
+                  onChange={(e) => setQuizName(e.target.value)}
+                  placeholder="e.g. Wealth Team Weekly Quiz - July"
+                  className="w-full bg-[#17140F]/70 backdrop-blur border border-[#AB932B]/25 rounded-lg px-3 py-2.5 text-sm text-[#F6F1E6] placeholder:text-[#F6F1E6]/30 focus:outline-none focus:border-[#AB932B]/70"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs uppercase tracking-[0.1em] text-[#F6F1E6]/60 mb-1.5">
+                  Timer (seconds)
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  value={timerSeconds}
+                  onChange={(e) => setTimerSeconds(e.target.value)}
+                  placeholder="e.g. 30"
+                  className="w-full bg-[#17140F]/70 backdrop-blur border border-[#AB932B]/25 rounded-lg px-3 py-2.5 text-sm text-[#F6F1E6] placeholder:text-[#F6F1E6]/30 focus:outline-none focus:border-[#AB932B]/70"
+                />
+                <p className="text-[11px] text-[#F6F1E6]/40 mt-1.5">
+                  Initial value — can be changed later before the live session.
+                </p>
+              </div>
+
+              <div>
+                <label
+                  htmlFor="questionFile"
+                  className="flex items-center justify-between gap-3 border border-dashed border-[#AB932B]/40 rounded-lg px-3 py-3 cursor-pointer bg-[#17140F]/50 backdrop-blur hover:border-[#AB932B]/70 transition-colors"
+                >
+                  <span className="text-sm text-[#F6F1E6]/80 truncate">
+                    {fileName || "Choose .xlsx file"}
+                  </span>
+                  <span className="text-xs uppercase tracking-[0.1em] text-[#AB932B] shrink-0">
+                    Browse
+                  </span>
+                </label>
+                <input
+                  id="questionFile"
+                  type="file"
+                  accept=".xlsx"
+                  onChange={handleFile}
+                  className="sr-only"
+                />
+                {parseError && <p className="text-xs text-[#c98789] mt-2">{parseError}</p>}
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* RIGHT: validation preview + confirm */}
+        <section className="min-h-0 flex flex-col rounded-2xl border border-[#AB932B]/15 bg-[#1E1B16] overflow-hidden">
+          <div className="flex-1 min-h-0 overflow-auto">
+            {rows.length === 0 ? (
+              <div className="h-full flex items-center justify-center px-8 text-center">
+                <p className="text-sm text-[#F6F1E6]/40">
+                  Select a .xlsx file on the left to preview parsed questions here.
+                </p>
+              </div>
+            ) : (
+              <table className="min-w-full text-sm">
+                <thead className="sticky top-0 bg-[#1E1B16] z-10">
+                  <tr className="text-left text-xs uppercase tracking-[0.1em] text-[#AB932B]/60">
+                    <th className="px-6 py-3 font-medium">Status</th>
+                    <th className="px-3 py-3 font-medium">Q#</th>
+                    <th className="px-3 py-3 font-medium">Question Text</th>
+                    <th className="px-3 py-3 font-medium">Marks</th>
+                    <th className="px-3 py-3 font-medium">Correct</th>
+                    <th className="px-3 py-3 font-medium">Notes</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((r, i) => {
+                    const rowStatus =
+                      r.errors.length > 0 ? "error" : r.warnings.length > 0 ? "warning" : "ok";
+                    const borderColor =
+                      rowStatus === "error"
+                        ? "border-l-[#925254]"
+                        : rowStatus === "warning"
+                        ? "border-l-[#AB932B]"
+                        : "border-l-transparent";
+                    const labelColor =
+                      rowStatus === "error"
+                        ? "text-[#c98789]"
+                        : rowStatus === "warning"
+                        ? "text-[#AB932B]"
+                        : "text-[#F6F1E6]/40";
+                    const label = rowStatus === "error" ? "Error" : rowStatus === "warning" ? "Warning" : "Ready";
+                    return (
+                      <tr
+                        key={i}
+                        className={`border-t border-t-[#F6F1E6]/5 border-l-4 ${borderColor} hover:bg-[#17140F]/40`}
+                      >
+                        <td className={`px-6 py-2.5 font-medium ${labelColor}`}>{label}</td>
+                        <td className="px-3 py-2.5 text-[#F6F1E6]/70">{r["Question No"]}</td>
+                        <td className="px-3 py-2.5">{r["Question Text"]}</td>
+                        <td className="px-3 py-2.5 text-[#F6F1E6]/70">{r["Marks*"]}</td>
+                        <td className="px-3 py-2.5 text-[#F6F1E6]/70">{r["CorrectAnswer*"]}</td>
+                        <td className="px-3 py-2.5 text-xs text-[#F6F1E6]/50">
+                          {[...r.errors, ...r.warnings].join("; ")}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )}
+          </div>
+
+          <div className="shrink-0 border-t border-[#AB932B]/15 p-5 flex items-center justify-between gap-4">
+            <div className="min-w-0">
+              {status === "success" && (
+                <p className="text-sm text-[#AB932B]">
+                  Quiz created (id: {newQuizId}). All {rows.length} questions inserted.
+                </p>
+              )}
+              {status === "error" && (
+                <p className="text-sm text-[#c98789]">
+                  Upload failed, nothing was saved: {uploadError}
+                </p>
+              )}
+            </div>
+            <button
+              onClick={handleConfirm}
+              disabled={!canConfirm}
+              className="shrink-0 rounded-xl bg-[#AB932B] text-[#17140F] font-medium px-6 py-3 text-sm uppercase tracking-[0.15em] disabled:opacity-30 disabled:cursor-not-allowed hover:bg-[#c2a832] transition-colors"
+            >
+              {status === "uploading" ? "Uploading…" : "Confirm upload"}
+            </button>
+          </div>
+        </section>
+      </main>
     </div>
   );
 }
